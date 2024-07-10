@@ -22,11 +22,15 @@ Cons: password can be stolen
 - Possession-based authentication:
 Possess something that real person will possess proven via phone/text message; keycards; access token device
 - Multi factor authentication/2 factor authentication: combination of above two
+
 2. Authorization
 
 Answer question: should this user be allowed do what they want to do? Yes/No
+
 -> Depends on who that user is, their roles
+
 -> Authorization needs to be done first
+
 3. Principle
 
 The person you are trying to identify through the authentication: currently logged in user. Once username and password, for example, passed the authentication, the apps accepts user and create a principle and remembers it -> user doesnt need to enter username and password for every requests and page load.
