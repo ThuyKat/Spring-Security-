@@ -49,8 +49,126 @@ spring.security.user.name =kat
 spring.security.user.password=pass
 ```
 # How to config so Spring Security will refer to a list of user? 
-- AuthenticationManager: it has method called authenticate() either return a successful authentication or throws error
+## AuthenticationManager
+-  it has method called authenticate() either return a successful authentication or throws error
+- We need to config what it does to build up pattern, not working with it directly but builder class called AuthenticaltionManagerBuilder. We need to speciy: Kind of authetication we want? memory authentication? -> we provide username, pass, roles -> a new AuthenticationManager is built. 
+- There is a method called ConfigureGlobal (AuthenticationManagerBuilder), it takes AuthenticationManagerBuilder as its argument. Spring Security calls configure method and pass in AuthenticationManagerBuilder. It gives developer opportunity to  override this method to create custom method take AuthenticationManagerBuilder as argument instead of using default authentication. 
 
-We need to config what it does to build up pattern, not working with it directly but builder class called AuthenticaltionManagerBuilder. We need to speciy: Kind of authetication we want? memory authentication? -> we provide username, pass, roles -> a new AuthenticationManager is built. 
+```java
+@EnableWebSecurity
 
-There is a class called ConfigureGlobal (AuthenticationManagerBuilder), it takes AuthenticationManagerBuilder as its argument. Spring Security calls configure method and pass in AuthenticationManagerBuilder. It gives developer opportunity to  override this method to create custom method take AuthenticationManagerBuilder as argument instead of using default authentication. 
+public class SecurityConfiguration {
+
+	private PasswordEncoder passwordEncoder;
+	private UserDetailsService userDetailService;
+
+	@Autowired
+	public SecurityConfiguration(PasswordEncoder passwordEncoder, UserDetailsService userDetailService) {
+		this.userDetailService = userDetailService;
+		this.passwordEncoder = passwordEncoder;
+	}
+
+	public void configureGlobal(AuthenticationManagerBuilder auth) throws Exception {
+		auth.userDetailsService(userDetailService).passwordEncoder(passwordEncoder);
+	}
+
+}
+```
+- We should always have encoded/hashed passwords. In a separate class, we define the beans for PasswordEncoder and UserDetailService
+```java
+@Configuration
+public class ConfigBean {
+	
+	@Bean
+	public PasswordEncoder passwordEncoder() {
+		 return PasswordEncoderFactories.createDelegatingPasswordEncoder();
+		
+
+	}
+	@Bean
+	public UserDetailsService userDetailsService() {
+		InMemoryUserDetailsManager manager = new InMemoryUserDetailsManager();
+		manager.createUser( User
+				.withUsername("kat")
+				.password(passwordEncoder()
+						.encode("pass")
+						)
+				.roles("USER")
+				.build());
+		manager.createUser( User
+				.withUsername("gou")
+				.password(passwordEncoder()
+						.encode("pass"))
+				.roles("ADMIN")
+				.build());
+		 return manager;
+		
+	}
+```
+## EnableWebSecurity annotation 
+this annotation enable support for spring security and integrate into MVC framework
+
+## Authorization : I want different APIs having different levels of access control
+
+For example, we want "/" path be accessible to everyone or unauthenticated, "/user" be accessible to User and Admin, and "/admin" only accessible to Admin
+
+```java
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class SecurityDemoController {
+
+	@GetMapping("/")
+	public String home() {
+		return("<h1>Welcome</h1>");
+	}
+	
+	@GetMapping("/user")
+	public String user() {
+		return("<h1>Welcome User</h1>");
+	}
+	
+	@GetMapping("/")
+	public String admin() {
+		return("<h1>Welcome Admin</h1>");
+	}
+}
+```
+
+- We are going to user object of type HttpSecurity, it let us configure the path and access restriction for those path. There is a  class called SecurityFilterChain which has securityFilterChain method that takes HttpSecurity as its argument. We will need to create a bean of this SecurityFilterChain class which will be utilised internally by the Spring Security framework. It represents the chain of filters that handle security-related tasks for incoming HTTP requests in application. This filters handle tasks such as authentication, authorization, CSRF protection, session management, etc. Each filter in the chain performs specific tasks and passes the request along to the next filter in the chain until the request is fully processed. 
+The following config allows only authenticated users to see the greeting that matched to their roles: 
+
+```java
+@Bean
+	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+
+		http.authorizeHttpRequests(
+				(requests) -> requests
+				.requestMatchers("/admin")
+				.hasRole("ADMIN")
+				.requestMatchers("/user")
+				.hasAnyRole("ADMIN", "USER")
+				.requestMatchers("/")
+				.permitAll()
+				.anyRequest()
+				.authenticated()
+				)
+				.formLogin(
+				(form) -> form.loginPage("/login")
+				.permitAll()
+				)
+				.logout(
+				(logout) -> logout.permitAll()
+				);
+
+		return http.build();
+```
+This can be placed in to BeanConfig class defined above. 
+
+On the screen, though we see the same login page, if we hit /admin path and login with user's credential, Spring will not allow it. Also, in order to login as user, we must logout of admin role before logging in again. 
+
+
+
+
+
