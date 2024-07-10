@@ -12,6 +12,7 @@
 - Method level security ( granular and powerful)
 # 5 cores terms
 1. Authentication
+
 Answer question: " Who are you" 
 - Knowledge-based authentication: 
 ID + details access via username and password/pincode/answer questions
@@ -22,10 +23,12 @@ Cons: password can be stolen
 Possess something that real person will possess proven via phone/text message; keycards; access token device
 - Multi factor authentication/2 factor authentication: combination of above two
 2. Authorization
+
 Answer question: should this user be allowed do what they want to do? Yes/No
 -> Depends on who that user is, their roles
 -> Authorization needs to be done first
 3. Principle
+
 The person you are trying to identify through the authentication: currently logged in user. Once username and password, for example, passed the authentication, the apps accepts user and create a principle and remembers it -> user doesnt need to enter username and password for every requests and page load.
 
 One user can have multiple IDs, but there should be just one logged in user( just like how google account is)
