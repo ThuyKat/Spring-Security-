@@ -41,7 +41,7 @@ How does autherization happen? permissions allowed for given users -> granted au
 5. Roles 
 Group of authroties assigned together so , for example, a store clerk signs in, roles are assigned to them, which is different to store manager. 
 
-# Add Spring security to spring boot: effects and why they happen? 
+## Add Spring security to spring boot: effects and why they happen? 
 
 1.  Dependency: spring-boot-starter-security
 2. Configuration: no need to config. By adding the dependency, Spring generates log-in page and filters.Basic servlets are working underneath to provide functionalities
@@ -55,8 +55,8 @@ Group of authroties assigned together so , for example, a store clerk signs in, 
 spring.security.user.name =kat
 spring.security.user.password=pass
 ```
-# How to config so Spring Security will refer to a list of user? 
-## AuthenticationManager
+## How to config so Spring Security will refer to a list of user? 
+### AuthenticationManager
 -  it has method called authenticate() either return a successful authentication or throws error
 - We need to config what it does to build up pattern, not working with it directly but builder class called AuthenticaltionManagerBuilder. We need to speciy: Kind of authetication we want? memory authentication? -> we provide username, pass, roles -> a new AuthenticationManager is built. 
 - There is a method called ConfigureGlobal (AuthenticationManagerBuilder), it takes AuthenticationManagerBuilder as its argument. Spring Security calls configure method and pass in AuthenticationManagerBuilder. It gives developer opportunity to  override this method to create custom method take AuthenticationManagerBuilder as argument instead of using default authentication. 
@@ -112,7 +112,7 @@ public class ConfigBean {
 		
 	}
 ```
-## EnableWebSecurity annotation 
+### EnableWebSecurity annotation 
 this annotation enable support for spring security and integrate into MVC framework
 
 ## Authorization : different APIs having different levels of access control
