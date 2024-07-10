@@ -115,7 +115,7 @@ public class ConfigBean {
 ## EnableWebSecurity annotation 
 this annotation enable support for spring security and integrate into MVC framework
 
-## Authorization : I want different APIs having different levels of access control
+## Authorization : different APIs having different levels of access control
 
 For example, we want "/" path be accessible to everyone or unauthenticated, "/user" be accessible to User and Admin, and "/admin" only accessible to Admin
 
@@ -147,7 +147,7 @@ public class SecurityDemoController {
 The following config allows only authenticated users to see the greeting that matched to their roles: 
 
 ```java
-@Bean
+	@Bean
 	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
 		http.authorizeHttpRequests(
@@ -162,8 +162,7 @@ The following config allows only authenticated users to see the greeting that ma
 				.authenticated()
 				)
 				.formLogin(
-				(form) -> form.loginPage("/login")
-				.permitAll()
+				(formLogin) -> formLogin.permitAll()
 				)
 				.logout(
 				(logout) -> logout.permitAll()
