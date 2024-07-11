@@ -157,6 +157,7 @@ public class ConfigBean {
 	public PasswordEncoder passwordEncoder() {
 		 return PasswordEncoderFactories.createDelegatingPasswordEncoder();
 	}
+	// call this bean to customize the in-memory data, not needed if we run from sql script
 	@Bean
 	public UserDetailsService userDetailsService() {
 		InMemoryUserDetailsManager manager = new InMemoryUserDetailsManager();
@@ -200,7 +201,7 @@ public class SecurityConfiguration {
 ```
 #### JdbcUserDetailsManager/InMemoryUserDetailsManager
 
- Other way is create a custom bean in the configuration class is by using in-built implementation of UserDetailsService with JdbcUserDetailsManager and pass it the dataSource bean defined in application.properties. This is like JDBC-based authentication that it loads JDBC data source to load user details. 
+ Other way is create a custom UserDetailsService bean in the configuration class is by using in-built implementation of UserDetailsService with JdbcUserDetailsManager and pass it the dataSource bean defined in application.properties. This is like JDBC-based authentication that it loads JDBC data source to load user details. 
  * Pros: 
  --> in-built method, just need to define a JdbcUserDetailsManager bean and configure it with a data source
 
@@ -209,6 +210,9 @@ public class SecurityConfiguration {
  * Cons:
 
  --> Less flexibility because it is limited to JDBC data sources and predefined SQL queries which follows format including 2 schemas: users table and authorties table with specified columns and data types. 
+ Implementation: 
+
+*  OPTION 1: call JdbcUserDetailsManager in custom UserDetailsService bean
  ```java
  @Bean
 	public UserDetailsService userDetailsService() {
@@ -216,6 +220,18 @@ public class SecurityConfiguration {
 		manager.setDataSource(dataSource);
 		return manager;}
  ```
+* OPTION 2: Not specify any custom UserDetailsService bean, use the Jdbc-based authentication. 
+
+```java
+@Autowired
+public void configureGlobal(AuthenticationManagerBuilder auth) throws Exception {
+    auth.jdbcAuthentication()
+        .dataSource(dataSource)
+        .usersByUsernameQuery("select username, password, enabled from users where username=?")
+        .authoritiesByUsernameQuery("select username, authority from authorities where username=?");
+}
+```
+Since we do not customize the UserDetailsService bean, Spring Security automatically configures a JdbcUserDetailsManager for us. the inbuilt manager loads user details from the relatinal database using predefined SQL queries. 
 
 Moreover, we can create a Custom UserDetailsService  via creating a class that implements UserDetailsService interface. UserDetailsService has a single method 'loadUserByUsername(String username) which is used by Spring Security to load user details
  ```java
