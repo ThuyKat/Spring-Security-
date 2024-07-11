@@ -233,6 +233,22 @@ public void configureGlobal(AuthenticationManagerBuilder auth) throws Exception 
 ```
 Since we do not customize the UserDetailsService bean, Spring Security automatically configures a JdbcUserDetailsManager for us. the inbuilt manager loads user details from the relatinal database using predefined SQL queries. 
 
+Here are the schema format provided by docs.spring.io: 
+
+```sql
+create table users(
+	username varchar_ignorecase(50) not null primary key,
+	password varchar_ignorecase(50) not null,
+	enabled boolean not null
+);
+
+create table authorities (
+	username varchar_ignorecase(50) not null,
+	authority varchar_ignorecase(50) not null,
+	constraint fk_authorities_users foreign key(username) references users(username)
+);
+create unique index ix_auth_username on authorities (username,authority);
+```
 Moreover, we can create a Custom UserDetailsService  via creating a class that implements UserDetailsService interface. UserDetailsService has a single method 'loadUserByUsername(String username) which is used by Spring Security to load user details
  ```java
  @Service
@@ -252,8 +268,6 @@ public class CustomUserDetailsService implements UserDetailsService {
 }
 
  ```
- 
-
 ### EnableWebSecurity annotation 
 this annotation enable support for spring security and integrate into MVC framework
 
@@ -261,9 +275,11 @@ this annotation enable support for spring security and integrate into MVC framew
 
 - When we start the application, the AuthenticationFilter will pass user'credientials to AuthenticationManager, the manager picks the correct AuthenticationProvider and evoke the authenticate method while passing the authentication object with users credentials. The authenticationProvider object then call UserDetailsService to get userDetail instances from DB. The authenticationProvider nows get all what is needed for authentication process, it returns to the filter the authentication object with the Principle which is credentials already verified using DB's userDetails. 
 
-## Authentication process demonstration : JDBC authentication with Spring Security
+## Authentication process demonstration : JDBC authentication with Spring Security and JPA
 
-1.  We need to tell Spring that we have user credentials in our database and need to go look for username, if username matched then look for password, then if the user is valid, activated --> We need to connect the server to our database and also config DataSource bean
+1. Config DataSource in application.properties
+
+ We need to tell Spring that we have user credentials in our database and need to go look for username, if username matched then look for password, then if the user is valid, activated --> We need to connect the server to our database and also config DataSource bean
 
 ```
 spring.application.name=SpringJDBC
@@ -272,34 +288,30 @@ spring.datasource.username=root
 spring.datasource.url=jdbc:mysql://localhost:3306/SSDemo?createDatabaseIfNotExist=true
 spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
 ```
-AuthenticationProvider instance will use UserDetailService to get UserDetail instance from the database. By default, if we do not explicitly configure Spring Security to use a JDBC-based authentication mechanism or provide a custom UserDetailsService that interacts with the database, Spring Security defaults to an in-memory store for managing user credentials and roles. This behaviour ensures that developers can quickly get started with Spring Security without needing to set up a database or customer user management system. 
+AuthenticationProvider instance will use UserDetailService to get UserDetail instance from the database. By default, if we do not explicitly configure Spring Security to use a JDBC-based authentication mechanism or provide a custom UserDetailsService that interacts with the database, Spring Security defaults to an in-memory store for managing user credentials and roles. This behaviour ensures that developers can quickly get started with Spring Security without needing to set up a database or customer user management system. In this demonstration, we are going to use the custom UserDetailsService class and UserDetails class. 
 
-2.  JDBC-based authentication
-
+2.  JDBC-based authentication: using custom UserDetailService and PasswordEncoder
 ```java
 @EnableWebSecurity
-public class SecurityConfiguration {
-private DataSource dataSource;
-@Autowired
-	public void configureGlobal(AuthenticationManagerBuilder auth) throws Exception {
-//		auth.userDetailsService(userDetailService).passwordEncoder(passwordEncoder);
-		auth.jdbcAuthentication()
-			.dataSource(dataSource)
-	}
-}
-```
-jdbcAuthentication(): this method configures Spring Security to use JDBC-based authentication
 
-3.  Custom UserDetailsService bean
-```java
-@Bean
-public UserDetailsService userDetailsService() {
-		JdbcUserDetailsManager manager = new JdbcUserDetailsManager();
-		manager.setDataSource(dataSource);
-		return manager;
-}
+public class SecurityConfiguration {
+	PasswordEncoder passwordEncoder;
+	UserDetailsService userDetailsService;
+	
+	@Autowired
+	public SecurityConfiguration(PasswordEncoder passwordEncoder,UserDetailsService userDetailsService) {
+		this.passwordEncoder = passwordEncoder;
+		this.userDetailsService = userDetailsService;
+	}
+	
+	public void configureGlobal(AuthenticationManagerBuilder auth) throws Exception {
+		//create custom UserDetailsService -> JPA Services -> DB
+		auth.userDetailsService(userDetailsService).passwordEncoder(passwordEncoder)
+			;
+	}
 ```
-4.  In this simple example, we are going to use plain text password ( no encoder). 
+3.  Custom PasswordEncoder
+In this simple example, we are going to use plain text password ( no encoder). 
 ```java
 @Bean
 	public PasswordEncoder passwordEncoder() {
@@ -307,24 +319,67 @@ public UserDetailsService userDetailsService() {
 		return NoOpPasswordEncoder.getInstance();
 	}
 ```
-- When using Spring Security with JDBC-based authentication, the users and authorities stable need to adhere to specific chemas that Spring Security expects with certain columns and types. 
-Here are the schema format provided by docs.spring.io: 
+4. Custom UserDetailsService 
+- We create a separate service class called MyUserDetailsService implementing UserDetailsService. Here we overrider the method findUserByUsername(). Inside the method, we need to do 2 things: find the User object using UserRepository and map it to the MyUserDetails implementing UserDetails dto.
 
-```sql
-create table users(
-	username varchar_ignorecase(50) not null primary key,
-	password varchar_ignorecase(50) not null,
-	enabled boolean not null
-);
+```java
+@Service
+public class MyUserDetailsService implements UserDetailsService {
+	
+	@Autowired
+	UserRepository userRepository;
 
-create table authorities (
-	username varchar_ignorecase(50) not null,
-	authority varchar_ignorecase(50) not null,
-	constraint fk_authorities_users foreign key(username) references users(username)
-);
-create unique index ix_auth_username on authorities (username,authority);
+	@Override
+	public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+		//get the User object from DB
+		Optional<User>user = userRepository.findByUsername(username);
+
+		user.orElseThrow(()-> new UsernameNotFoundException("Not found: "+ username));
+		//map user to MyUserDetails
+		return user.map(MyUserDetails::new).get();
+	
+	}	
+}
+```java
+public class MyUserDetails implements UserDetails{
+	private static final long serialVersionUID = 1L;
+	private String userName;
+	private String password;
+	private boolean active;
+	private List<GrantedAuthority>authorities;
+
+	public MyUserDetails(User user) {
+		this.userName = user.getUsername();
+		this.password = user.getPassword();
+		this.active = user.isActive();
+		this.authorities = Arrays.stream(user.getRoles().split(","))
+				.map(SimpleGrantedAuthority::new)
+				.collect(Collectors.toList());
+		
+	}
+	public MyUserDetails() {	
+	}
+	@Override
+	public Collection<? extends GrantedAuthority> getAuthorities() {
+		// TODO Auto-generated method stub
+		return authorities;
+	}
+	@Override
+	public String getPassword() {
+		// TODO Auto-generated method stub
+		return password;
+	}
+	@Override
+	public String getUsername() {
+		// TODO Auto-generated method stub
+		return userName;
+	}
+	 public boolean isEnabled() {
+		return active;
+	}
+}
 ```
-
+5. Create User entity model and UserRepository similar to how we normally create with other SpringBoot Project
 ## Authorization : different APIs having different levels of access control
 
 For example, we want "/" path be accessible to everyone or unauthenticated, "/user" be accessible to User and Admin, and "/admin" only accessible to Admin
@@ -383,6 +438,7 @@ The following config allows only authenticated users to see the greeting that ma
 This can be placed in to BeanConfig class defined above. 
 
 On the screen, though we see the same login page, if we hit /admin path and login with user's credential, Spring will not allow it. Also, in order to login as user, we must logout of admin role before logging in again. 
+
 
  
 
