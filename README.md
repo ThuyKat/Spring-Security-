@@ -10,7 +10,7 @@
 - Intra App authorization like OAuth
 - Microservice security(using tokens, JWT)
 - Method level security ( granular and powerful)
-# 5 cores terms
+# 5 core terms
 1. Authentication
 
 Answer question: " Who are you" 
