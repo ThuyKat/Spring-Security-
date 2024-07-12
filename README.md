@@ -480,7 +480,19 @@ When someone authenticate, the signature can only be calculated by the server us
 
 ### JWT creation and exchange
 
+- Server receives User's username and password, authenticate it and create a JWT after authentication is completed, then send back JWT to client.
+- Client side saves JWT in local storage or in a cookie. 
+- Chilent passes JWT to the server on subsiquent HTTP requests. JWT resides in HTTP header, using the Bearer schema: 
+``` Authorization: Bearer <JWT>
+```
+- The server checks the value in the header, decode JWT 's header and payload using Base64 decode, compute them and compare with the signature on JWT. 
+### How secured is JWT
 
+- no confidential info on JWT like password, social id of user, just enough info for the server
+- server just verify JWT no matter who sends it, so user must be careful about how they send JWT, such as using https protocol and other authentication and authorization mechanisms like OAuth, to make sure JWT is not be stolen
+- In case JWT is stolen, server has a blacklist to invalid JWTs. This blacklist is a database or in-memory store that keeps track of invalidated JWTs. Each entry includes the token identifier and an expiration time. We can use the Token unique identifier in the token payload to track and blacklist if needed.. So in adition to verify the signature part of JWT, server will need to check for JWT blacklist as well. If its on the blacklist, server will respond with a 401 Unauthorized status code. 
+
+## Implement JWT based authentication
 
 
 
