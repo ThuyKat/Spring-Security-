@@ -451,8 +451,37 @@ On the screen, though we see the same login page, if we hit /admin path and logi
 When we accessing a page from a server, what information we need to send it. If it is a static HTML page, we need just URL of the page that we are looking for and the server sends us back the page. If we need another page, just send the URL. The server doesnt remember our previous requests. So if server is static and available to everyone, there is no problem in getting the pages from the server. If the server is dynamic, the server will send the information depending on who the user is. In this case, the information we send to the server just not the page you want, but also who you are. We need to provide all that infomation every time we send requests. 
  
  ### How website remember user's info  
-- Session token : like ticketing system used in customer services, when user is authenticated, the webapp creates a session and keep track of it itself. It creates a sessionId associated with the session and send back that id to user. Subsequencely, the client pass the sessionID to the server as a part of every request. The server looks it up and identifies who the client is. How the client passes sessionID to the server depends on implementation, the most common approach is to save the sessionID in a cookie so that it is automatically added on the cookie header on subsequent requests. Authentication happens, the server saves the state and returns the response for the cookie. Subsequen requests from the browser automatially have the cookie in the header because thats what browsers do. By this way, the server has info and can look it up again to identify the client. This mechanism of saving sessionID tokens saved in cookies is the most popular way for authorisation. 
-- Json web token
+- Session token: Reference token refers to a state on the server
+
+like ticketing system used in customer services, when user is authenticated, the webapp creates a session and keep track of it itself. It creates a sessionId associated with the session and send back that id to user. Subsequencely, the client pass the sessionID to the server as a part of every request. The server looks it up and identifies who the client is. How the client passes sessionID to the server depends on implementation, the most common approach is to save the sessionID in a cookie so that it is automatically added on the cookie header on subsequent requests. Authentication happens, the server saves the state and returns the response for the cookie. Subsequen requests from the browser automatially have the cookie in the header because thats what browsers do. By this way, the server has info and can look it up again to identify the client. This mechanism of saving sessionID tokens saved in cookies is the most popular way for authorisation. 
+
+- Json web token - Json object as a token: value token
+
+Now we dont have just 1 server but multiple servers behind a load balancer. The load balancer decides which server to route the request to. This results in session info will be in memory of server1 after the first authorisation but not in server2 which handles next requests.
+
+SOLUTION 1: All of servers might need to share a session cache (Redis) where they share the session to and look up the session from. However, this can be one single point of failure: if redirection is down, all sessions are down.  
+
+SOLUTION 2: sticky session pattern - the load balancer will remember which server remembers the given user session info and it will redirect user to that particular server only. However this is not very scalable
+
+SOLUTION 3: Instead of registering the session in the system and giving the client the sessionID, server records details of interaction with the client and hand it to the client.The client will bring back that record next time it sends requests to this server or other server, any other server. That server by read the record will understand and able to handle requests in the next session just like how the first server did. However, one problem is we need the record to be trustworthy, and hence the first server needs to leave a signature on that record. The next server once see the record can verify that signature if its valid. 
+
+--> SOLUTION 3 is JWT's machenism. Now instead of server saving info state and client receiving SessionID as token, the server sends user's info as a token in Json format. When the client makes a subsequent request, the client sends the whole Json token as the request (to answer who the client is, with ID, name, whether the client is successfuly authenticated etc) which is everything the server needs. Server will first verify the signature then details. 
+
+### Structure of JWT
+3 parts (Json objects) being encoded by base64
+
+- Header: type value of token "JWT", algorithm used to sign
+- Payload: id of user in the system, name of user, issue at - to identify who the user is
+- Signature: crytographic hashed
+
+--> jwt.io to decode JWT 
+
+When someone authenticate, the signature can only be calculated by the server using the algorithm, which after calculation will have to match the payload and header 's values. The algorithm contains a secret key so even it is out in the public only the server can compute its value. 
+
+### JWT creation and exchange
+
+
+
 
 
 
