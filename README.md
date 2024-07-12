@@ -380,6 +380,9 @@ public class MyUserDetails implements UserDetails{
 }
 ```
 5. Create User entity model and UserRepository similar to how we normally create with other SpringBoot Project
+## Authentication with LDAP
+We are going to run our own instance of opensource LDAP server. This LDAP server will hold information in-memory
+- Ldap data interchange format: syntax to work with ldap
 ## Authorization : different APIs having different levels of access control
 
 For example, we want "/" path be accessible to everyone or unauthenticated, "/user" be accessible to User and Admin, and "/admin" only accessible to Admin
@@ -439,11 +442,17 @@ This can be placed in to BeanConfig class defined above.
 
 On the screen, though we see the same login page, if we hit /admin path and login with user's credential, Spring will not allow it. Also, in order to login as user, we must logout of admin role before logging in again. 
 
+## Json Web Tokens (JWT): for secured communication
 
+- RFC 7519: how JWT should be structured
+
+- HTTP: stateless protocol
+
+When we accessing a page from a server, what information we need to send it. If it is a static HTML page, we need just URL of the page that we are looking for and the server sends us back the page. If we need another page, just send the URL. The server doesnt remember our previous requests. So if server is static and available to everyone, there is no problem in getting the pages from the server. If the server is dynamic, the server will send the information depending on who the user is. In this case, the information we send to the server just not the page you want, but also who you are. We need to provide all that infomation every time we send requests. 
  
-
-
-
+ ### How website remember user's info  
+- Session token : like ticketing system used in customer services, when user is authenticated, the webapp creates a session and keep track of it itself. It creates a sessionId associated with the session and send back that id to user. Subsequencely, the client pass the sessionID to the server as a part of every request. The server looks it up and identifies who the client is. How the client passes sessionID to the server depends on implementation, the most common approach is to save the sessionID in a cookie so that it is automatically added on the cookie header on subsequent requests. Authentication happens, the server saves the state and returns the response for the cookie. Subsequen requests from the browser automatially have the cookie in the header because thats what browsers do. By this way, the server has info and can look it up again to identify the client. This mechanism of saving sessionID tokens saved in cookies is the most popular way for authorisation. 
+- Json web token
 
 
 
