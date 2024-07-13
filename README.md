@@ -494,6 +494,114 @@ When someone authenticate, the signature can only be calculated by the server us
 
 ## Implement JWT based authentication
 
+**Objectives**
+1. Create a new authentication API endpoint
+2. Examine every incoming request for valid JWT and authorize
+
+**dependencies**
+1. Dependency to create jwt, auto validate existing jwt just like how jwt.io does
+```xml
+<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt</artifactId>
+			<version>0.12.6</version>
+</dependency>
+```
+2. Dependency to support Java 9+ because this will not be in the JDK
+
+3. Create a class to verify existing token and generate token
+```java
+//look up info in jwt
+//all jwt related
+public class JwtUtil {
+	/*
+	 * only for testing purpose: 
+	 * should get the key from a setting / property file 
+	 * that's in a more secure location and not in source code repository.
+	 */
+	private String SECRET_KEY = "secret";
+	public String extractUsername(String token) {
+		return extractClaim(token,Claims::getSubject);
+	}
+	public Date extractExpiration(String token) {
+		return extractClaim(token,Claims::getExpiration);
+	}
+	public <T> T extractClaim(String token,Function<Claims,T>claimsResolver) {
+		final Claims claims = extractAllClaims(token);
+		return claimsResolver.apply(claims);
+	}
+	private Claims extractAllClaims(String token) {
+		return Jwts.parser().setSigningKey(SECRET_KEY).build().parseClaimsJws(token).getBody();
+				
+	}
+	private boolean isTokenExpired(String token) {
+		return extractExpiration(token).before(new Date());
+	}
+	
+	//most important: taking userDetails into jwt
+	public String generateToken(UserDetails userDetails) {
+		Map<String,Object>claims =new HashMap<>();
+		return createToken(claims,userDetails.getUsername());
+	}
+	private String createToken(Map<String, Object> claims, String subject) {
+		
+		return Jwts.builder().setClaims(claims).setSubject(subject).setIssuedAt(new Date(System.currentTimeMillis()))
+				.setExpiration(new Date(System.currentTimeMillis()+1000*60*60*10))
+				.signWith(SignatureAlgorithm.HS256,SECRET_KEY).compact();
+	}
+	
+	public Boolean validateToken(String token,UserDetails userDetails) {
+		final String username = extractUsername(token);
+		return(username.equals(userDetails.getUsername()) && ! isTokenExpired(token));
+	}
+	
+}
+```
+4. Now we create an API endpoint that accepts userID and password and return JWT as response
+```java
+		
+	@PostMapping("/authenticate")
+	
+	public ResponseEntity<?>createAuthenticationToken(@RequestBody AuthenticationRequest authenticationRequest) throws Exception{
+	try {	
+		manager.authenticate(new UsernamePasswordAuthenticationToken(authenticationRequest.getUsername(),authenticationRequest.getPassword()));
+	}
+	catch(BadCredentialsException e){
+		throw new Exception("Incorrect username and password",e);
+	}
+	
+	final UserDetails userDetails = userDetailsService.loadUserByUsername(authenticationRequest.getUsername());
+	final String jwt = jwtUtil.generateToken(userDetails);
+	return ResponseEntity.ok(new AuthenticationResponse(jwt));
+
+}
+```
+- We create an authenticate method with an end point that map to an authentication token (AuthenticationResponse(jwt)). The method takes in the authentication request	which is the payload in the post body contains username and password. 
+- an authentication manager is used to call authenticate() method which takes UsernamePasswordAuthentiationToken as its argument. the argument is a concrete implementation of the Authentication interface thats encapsulates the user's credentials like username and password. 
+- If the credentials are invalid, the method throws an exception.
+- It they are valid, we create a jwt token using the jwtUtil that takes UserDetails objects (extracted from the system in-memory or DB) as its argument. Here we need to call an instance of UserDetails using UserDetailsService class and pass username to it. 
+- One problem is that Spring security will authenticate before letting us call /hello or /authenticate method in the controller. So we need to tell Spring to not authenticate when the web page is directed to /authenticate --> Override config method of HttpSecurity 
+```java
+@Bean
+	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+
+		http.csrf().disable().authorizeRequests().requestMatchers("/authenticate").permitAll().anyRequest()
+				.authenticated();
+		return http.build();
+	}
+```
+- csrf().disable(): disables cross-site reuqest forgery protection. 
+- .autheorizeRequest(): allows you to configure authorization rules for different URL patterns. Following this can be:
+
+**.requestMatchers(url_path)** :to specifies URL to which the following access rules apply; 
+
+**.authenticated()**: requires the user to be authenticated;
+
+**.hasRole(String role)**: requires user to have a specific role;
+
+**.permitAll()** : allows access to everyone or not authenticated
+
+
 
 
 
