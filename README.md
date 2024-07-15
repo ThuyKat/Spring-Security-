@@ -581,8 +581,11 @@ public class JwtUtil {
 ```
 - We create an authenticate method with an end point that map to an authentication token (AuthenticationResponse(jwt)). The method takes in the authentication request	which is the payload in the post body contains username and password. 
 - an authentication manager is used to call authenticate() method which takes UsernamePasswordAuthentiationToken as its argument. the argument is a concrete implementation of the Authentication interface thats encapsulates the user's credentials like username and password. 
-- If the credentials are invalid, the method throws an exception.
-- It they are valid, we create a jwt token using the jwtUtil that takes UserDetails objects (extracted from the system in-memory or DB) as its argument. Here we need to call an instance of UserDetails using UserDetailsService class and pass username to it. 
+- The AuthenticationManager processes the UsernamePasswordAuthenticationToken.
+- If the credentials are invalid, the method throws an exception.It checks the provided username and password against the configured user details service (UserDetailsService) or other authentication providers.
+- If the credentials are correct, the user is authenticated, and an Authentication object representing the authenticated user is returned.If the credentials are incorrect, an exception (such as BadCredentialsException) is thrown.
+- After authentication is done, we create a jwt token using the jwtUtil that takes UserDetails objects (extracted from the system in-memory or DB) as its argument. Here we need to call an instance of UserDetails using UserDetailsService class and pass username to it. 
+- The token is returned in response to browser to store in its local storage. 
 
 5.  One problem is that Spring security will authenticate before letting us call /hello or /authenticate method in the controller. So we need to tell Spring to not authenticate when the web page is directed to /authenticate --> Override config method of HttpSecurity 
 ```java
