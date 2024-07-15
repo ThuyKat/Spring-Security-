@@ -519,7 +519,10 @@ public class JwtUtil {
 	 * should get the key from a setting / property file 
 	 * that's in a more secure location and not in source code repository.
 	 */
-	private String SECRET_KEY = "secret";
+	SecretKey secretKey = Keys.secretKeyFor(SignatureAlgorithm.HS256);
+	
+	private String SECRET_KEY = javax.xml.bind.DatatypeConverter.printBase64Binary(secretKey.getEncoded());
+	
 	public String extractUsername(String token) {
 		return extractClaim(token,Claims::getSubject);
 	}
@@ -580,7 +583,8 @@ public class JwtUtil {
 - an authentication manager is used to call authenticate() method which takes UsernamePasswordAuthentiationToken as its argument. the argument is a concrete implementation of the Authentication interface thats encapsulates the user's credentials like username and password. 
 - If the credentials are invalid, the method throws an exception.
 - It they are valid, we create a jwt token using the jwtUtil that takes UserDetails objects (extracted from the system in-memory or DB) as its argument. Here we need to call an instance of UserDetails using UserDetailsService class and pass username to it. 
-- One problem is that Spring security will authenticate before letting us call /hello or /authenticate method in the controller. So we need to tell Spring to not authenticate when the web page is directed to /authenticate --> Override config method of HttpSecurity 
+
+5.  One problem is that Spring security will authenticate before letting us call /hello or /authenticate method in the controller. So we need to tell Spring to not authenticate when the web page is directed to /authenticate --> Override config method of HttpSecurity 
 ```java
 @Bean
 	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -590,7 +594,7 @@ public class JwtUtil {
 		return http.build();
 	}
 ```
-- csrf().disable(): disables cross-site reuqest forgery protection. 
+- csrf().disable(): disables cross-site request forgery protection. 
 - .autheorizeRequest(): allows you to configure authorization rules for different URL patterns. Following this can be:
 
 **.requestMatchers(url_path)** :to specifies URL to which the following access rules apply; 
@@ -600,6 +604,18 @@ public class JwtUtil {
 **.hasRole(String role)**: requires user to have a specific role;
 
 **.permitAll()** : allows access to everyone or not authenticated
+
+6. When run the application, we might get an error that requires us to specify a bean of AuthenticationManager. Previously by default the authentication manager is injected and we just need to use @Autowired annotation but now its not the case anymore. To define the bean, in BeanConfig class we have:
+
+```java
+@Bean
+	public AuthenticationManager authenticationManager(HttpSecurity http) throws Exception{
+	
+		AuthenticationManagerBuilder authenticationManagerBuilder = http.getSharedObject(AuthenticationManagerBuilder.class);
+		return authenticationManagerBuilder.build();
+	}
+```
+This bean now can be @Autowired to use in HelloController class to call .authenticate() method. 
 
 
 
