@@ -511,53 +511,104 @@ When someone authenticate, the signature can only be calculated by the server us
 
 3. Create a class to verify existing token and generate token
 ```java
+package com.demo.securityJWT;
+
+import java.util.Base64;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.Function;
+
+import javax.crypto.SecretKey;
+
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.stereotype.Component;
+
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+
 //look up info in jwt
 //all jwt related
+@Component
 public class JwtUtil {
 	/*
-	 * only for testing purpose: 
-	 * should get the key from a setting / property file 
+	 * only for testing purpose: should get the key from a setting / property file
 	 * that's in a more secure location and not in source code repository.
 	 */
-	SecretKey secretKey = Keys.secretKeyFor(SignatureAlgorithm.HS256);
-	
-	private String SECRET_KEY = javax.xml.bind.DatatypeConverter.printBase64Binary(secretKey.getEncoded());
-	
+	// CREATE A SECRETKEY
+//	private static final SecretKey SECRET_KEY = Keys.secretKeyFor(SignatureAlgorithm.HS256);
+//	@Value("${security.jwt.secret-key:defaultValue}") // this is for keys specified in application.properties
+//	private String jwtSecret = "4265656C64756E68";
+//	private Key getSigningKey() {
+//		byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);
+//		return Keys.hmacShaKeyFor(keyBytes);
+//	}
+	// OTHER OPTION TO CREATE KEY BY GENERATE SECRETKEY INSTANCE INSTEAD OF KEY
+	// INSTANCE.
+	// Using the SecretKey instance over the Key instance is advisable because the
+	// new method named verifyWith() to verify the token accepts the SecretKey type
+	// as a parameter
+	private static final SecretKey SECRET_KEY = Jwts.SIG.HS256.key().build();
+
+	private SecretKey getSigningKey1() {
+		System.out.println("Using key: " + Base64.getEncoder().encodeToString(SECRET_KEY.getEncoded()));
+		return SECRET_KEY;
+	}
+
+//	private static final SecretKey SECRET_KEY  = javax.xml.bind.DatatypeConverter.printBase64Binary(secretKey.getEncoded());
+
 	public String extractUsername(String token) {
-		return extractClaim(token,Claims::getSubject);
+		return extractClaim(token, Claims::getSubject);
 	}
+
 	public Date extractExpiration(String token) {
-		return extractClaim(token,Claims::getExpiration);
+		return extractClaim(token, Claims::getExpiration);
 	}
-	public <T> T extractClaim(String token,Function<Claims,T>claimsResolver) {
+
+	public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
+		System.out.println("I a in extractclaim");
 		final Claims claims = extractAllClaims(token);
+		System.out.println("done extract all claims");
 		return claimsResolver.apply(claims);
 	}
+
 	private Claims extractAllClaims(String token) {
-		return Jwts.parser().setSigningKey(SECRET_KEY).build().parseClaimsJws(token).getBody();
-				
+		System.out.println("I am in extract all claims");
+		try {
+			Claims claims = Jwts.parser().verifyWith(getSigningKey1()).build().parseSignedClaims(token).getPayload();
+			System.out.println("printing the result: " + claims);
+			return claims;
+		} catch (Exception e) {
+			System.out.println("Error parsing JWT: " + e.getMessage());
+			e.printStackTrace();
+			throw e; // Re-throw the exception or handle it as needed
+		}
 	}
+
 	private boolean isTokenExpired(String token) {
 		return extractExpiration(token).before(new Date());
 	}
-	
-	//most important: taking userDetails into jwt
+
+	// most important: taking userDetails into jwt
 	public String generateToken(UserDetails userDetails) {
-		Map<String,Object>claims =new HashMap<>();
-		return createToken(claims,userDetails.getUsername());
+		Map<String, Object> claims = new HashMap<>();
+		return createToken(claims, userDetails.getUsername());
 	}
+
 	private String createToken(Map<String, Object> claims, String subject) {
-		
-		return Jwts.builder().setClaims(claims).setSubject(subject).setIssuedAt(new Date(System.currentTimeMillis()))
-				.setExpiration(new Date(System.currentTimeMillis()+1000*60*60*10))
-				.signWith(SignatureAlgorithm.HS256,SECRET_KEY).compact();
+
+		return Jwts.builder().claims(claims).subject(subject).issuedAt(new Date(System.currentTimeMillis()))
+				.expiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 10)).signWith(getSigningKey1())
+				.compact();
+
 	}
-	
-	public Boolean validateToken(String token,UserDetails userDetails) {
+
+	public Boolean validateToken(String token, UserDetails userDetails) {
 		final String username = extractUsername(token);
-		return(username.equals(userDetails.getUsername()) && ! isTokenExpired(token));
+
+		return (username.equals(userDetails.getUsername()) && !isTokenExpired(token));
 	}
-	
+
 }
 ```
 4. Now we create an API endpoint that accepts userID and password and return JWT as response
@@ -622,6 +673,112 @@ NOTE: this is different to previous authentication without JWT .Here we need to 
 ```
 This bean now can be @Autowired to use in HelloController class to call .authenticate() method. 
 
+7. Testing via Postman
+
+- /authentication
+
+Specifying the header : Key -> Content-Type ; Value -> application/json
+![alt text](SS/image.png)
+
+- /hello
+
+Specifying the header: Key -> Authorization; Value -> Bearer < jwt token copied here >
+
+We need to tell Spring Security to listen to every request with 'Authorization' header, extract jwt from the request and username out of jwt, verify the jwt if valid then continue process with the content of jwt
+
+### Intercept request that contains jwt
+- Create a filter class that extends OncePerRequestFilter. This method looks for 'Authorization' as Key in header and Value contains 'Bearer'. It extracts the jwt token and username from Value after 'Bearer' using jwtUtil.extractUsername()
+- If username is not null and no user has been authenticated, Spring Security will look into the database to get UserDetail object. This is to compare the UserDetail object from the system to jwt using jwtUtil.validateToken method. 
+- If token is valid, it resumes the normal flows of Spring Security and hand off the control to the next filter in the Filter Chain
+- There are two more things we need: 1) tell spring to not create a session ( because token is used to validate user now) and 2) add our Filter class so it does it job before authenticating username and password. 
+
+```java
+@Component
+public class JwtRequestFilter extends OncePerRequestFilter {
+	@Autowired
+	JwtUtil jwtUtil;
+	@Autowired
+	UserDetailsService userDetailsService;
+
+	@Override
+	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+			throws ServletException, IOException {
+		// this has the option to pass the response to the next filter in the
+		// FilterChain
+		// this will need jwtUtil to verify jwt and pullout username and
+		// UserDetailsService
+
+		final String authorizationHeader = request.getHeader("Authorization");
+		String username = null;
+		String jwt = null;
+		Map<String, Object> errorDetails = new HashMap<>();
+		try {
+			if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
+				jwt = authorizationHeader.substring(7);
+				username = jwtUtil.extractUsername(jwt);
+			}
+			// get the UserDetails loaded from DB/memory from this username only when
+			// username can be extracted from jwt
+			// and when then SecurityContext hasnot had a authenticated user
+			if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+				System.out.println("username is not null and no user been authenticated yet");
+				UserDetails userDetails = this.userDetailsService.loadUserByUsername(username);
+				// verify if the token is validate
+				System.out.println("before validate token");
+				if (jwtUtil.validateToken(jwt, userDetails)) {
+					// continue what Spring Security will normally do
+					// set userDetails as principle
+					UsernamePasswordAuthenticationToken usernamePasswordAuthenticationToken = new UsernamePasswordAuthenticationToken(
+							userDetails, null, userDetails.getAuthorities());
+					/**
+					 * Creates a token with the supplied array of authorities.
+					 * 
+					 * @param authorities the collection of <tt>GrantedAuthority</tt>s for the
+					 *                    principal represented by this authentication object.
+					 */
+					usernamePasswordAuthenticationToken
+							.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+					SecurityContextHolder.getContext().setAuthentication(usernamePasswordAuthenticationToken);
+
+				}
+			}
+
+		} catch (Exception e) {
+			System.out.println("caught exception somehow!!");
+			errorDetails.put("message", "Authentication Error");
+			errorDetails.put("detail", e.getMessage());
+			response.setStatus(HttpStatus.FORBIDDEN.value());
+			response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+			ObjectMapper mapper = new ObjectMapper();
+			mapper.writeValue(response.getWriter(), errorDetails);
+		}
+		// hand off the control to the next filter in the filter chain
+		filterChain.doFilter(request, response);
+
+		// still we need to inject it in the FilterChain
+	}
+
+}
+```
+Adjust SecurityFilterChain bean: 
+```java
+	@Bean
+	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+
+		http.csrf((csrf) -> csrf.ignoringRequestMatchers("/authenticate")).authorizeHttpRequests(
+				(authorize) -> authorize.requestMatchers("/authenticate").permitAll().anyRequest().authenticated())
+				.sessionManagement(httpSecuritySessionManagementConfigurer -> httpSecuritySessionManagementConfigurer
+						.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+				.addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
+		// tell Spring security to not manage session or create session becaue we are
+		// using Jwt to make it stateless
+		// each request, SpringSecurity will set up a SecurityContext
+		// we need to make sure the filter we created is used before
+		// UsernamePasswordAuthenticationFilter is.
+		System.out.println("I am at Security Filter Chain");
+		return http.build();
+	}
+```
 
 
 
