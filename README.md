@@ -587,6 +587,8 @@ public class JwtUtil {
 - After authentication is done, we create a jwt token using the jwtUtil that takes UserDetails objects (extracted from the system in-memory or DB) as its argument. Here we need to call an instance of UserDetails using UserDetailsService class and pass username to it. 
 - The token is returned in response to browser to store in its local storage. 
 
+NOTE: this is different to previous authentication without JWT .Here we need to call authenticate() method to authentic username and password manually before generating jwt token. 
+
 5.  One problem is that Spring security will authenticate before letting us call /hello or /authenticate method in the controller. So we need to tell Spring to not authenticate when the web page is directed to /authenticate --> Override config method of HttpSecurity 
 ```java
 @Bean
