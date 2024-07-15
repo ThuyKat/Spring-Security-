@@ -779,6 +779,8 @@ Adjust SecurityFilterChain bean:
 		return http.build();
 	}
 ```
+- Testing via postman: 
+![alt text](SS/image1.png)
 
 
 
