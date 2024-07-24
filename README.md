@@ -174,9 +174,25 @@ public class ConfigBean {
 						.encode("pass"))
 				.roles("ADMIN")
 				.build());
-		 return manager;
+		 return manager; //InMemoryUserDetailsManager is a child of UserDetailsManager which is an implementation of UserDetailsService
 		
 	}
+```
+OR: 
+```java
+@Bean
+	public InMemoryUserDetailsManager userDetailsService() {
+		UserDetails user = User.builder()
+							.username("kat")
+							.password("pass")
+							.authorities("USER")
+							.build();
+		UserDetails admin = User.builder()
+							.username("gou")
+							.password("pass")
+							.authorities("ADMIN")
+							.build();
+		return new InMemoryUserDetailsManager(user,admin);
 ```
 Above code using inMemory authentication, we can be more flexible by using JDBC-based authentication like this: 
 ```java
@@ -220,6 +236,30 @@ public class SecurityConfiguration {
 		manager.setDataSource(dataSource);
 		return manager;}
  ```
+ OR :
+ ```java
+ @Bean
+	UserDetailsManager manager(DataSource dataSource){
+		JdbcUserDetailsManager users = new JdbcUserDetailsManager(dataSource);
+		
+		UserDetails user = User.builder()
+					.username("kat")
+					.password("pass")
+					.authorities("USER")
+					.build();
+		UserDetails admin = User.builder()
+					.username("gou")
+					.password("pass")
+					.authorities("USER","ADMIN")
+					.build();
+		if(!manager.userExists(user.getUsername())){
+			manager.createUser(user);
+		}
+		if(!manager.userExists(admin.getUsername())){
+			manager.createUser(admin);
+		}
+		return manager;
+	}
 * OPTION 2: Not specify any custom UserDetailsService bean, use the Jdbc-based authentication. 
 
 ```java
