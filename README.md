@@ -407,9 +407,10 @@ public class MyUserDetails implements UserDetails{
 		this.password = user.getPassword();
 		this.active = user.isActive();
 		this.authorities = Arrays.stream(user.getRoles().split(","))
-				.map(SimpleGrantedAuthority::new)
+				.map(SimpleGrantedAuthority::new) 
 				.collect(Collectors.toList());
-		
+		//SimpleGrantedAuthority is a class from SpringSecurity that implements the GrantedAuthority interface. It is used to represent an authority or role granted to the user
+		//when create a single user, we use: Collections.singletonList(new SimpleGrantedAuthority("ADMIN")) -  for example.
 	}
 	public MyUserDetails() {	
 	}
