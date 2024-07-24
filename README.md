@@ -315,6 +315,20 @@ this annotation enable support for spring security and integrate into MVC framew
 
 - When we start the application, the AuthenticationFilter will pass user'credientials to AuthenticationManager, the manager picks the correct AuthenticationProvider and evoke the authenticate method while passing the authentication object with users credentials. The authenticationProvider object then call UserDetailsService to get userDetail instances from DB. The authenticationProvider nows get all what is needed for authentication process, it returns to the filter the authentication object with the Principle which is credentials already verified using DB's userDetails. 
 
+## When multiple UserDetailsService beans are created (by mistake, not common), how can AuthenticationProvider be created?
+
+In this case, we need to specify the instance of AuthenticationProvider with which bean of UserDetailsService we would like to implement. 
+
+```java
+@Bean
+public AuthenticationProvider authenticationProvider(){
+	DaoAuthenticationProvider authenticationProvider = new DaoAuthenticationProvider();
+	authenticationProvider.setUserDetailsService(manager()); //use the custome JDBCUserDetailsManager provided before
+	//authenticationProvider.setUserDetailsService(userDetailService()); 
+	//-> this will use the in-memory UserDetailsService by default
+	authenticationPrivider.setpasswordEncoder(getencoder());
+}
+```
 ## Authentication process demonstration : JDBC authentication with Spring Security and JPA
 
 1. Config DataSource in application.properties
